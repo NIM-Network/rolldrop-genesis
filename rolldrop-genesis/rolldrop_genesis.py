@@ -92,25 +92,30 @@ def add_accounts_to_genesis_file(base_denom, bech32_prefix, airdrop_file_path, g
     total_accounts = len(airdrop_allocations)
 
     for row in airdrop_allocations:
-        amount = int(row[consts.AMOUNT_FIELD_NAME])
-        bech32_address = utils.hex_to_bech32(row[consts.CLAIM_ADDRESS_FIELD_NAME][2:].lower(), bech32_prefix)
-        if not utils.is_valid_bech32_address(bech32_prefix, bech32_address):
-            raise ValueError(f"Invalid address: {bech32_address}")
-        if row.get(consts.VESTING_FIELD_NAME) is not None:
-            vesting_start_time = row[consts.VESTING_FIELD_NAME][consts.VESTING_START_TIME_FIELD_NAME]
-            vesting_end_time = row[consts.VESTING_FIELD_NAME][consts.VESTING_END_TIME_FIELD_NAME]
-            genesis_data = add_vesting_account_to_genesis(base_denom=base_denom, genesis=genesis_data, address=bech32_address, amount=amount, 
-            vesting_start_time=vesting_start_time, vesting_end_time=vesting_end_time)
-            vesting_accounts_added += 1
-        else:
-            genesis_data = add_base_account_to_genesis(base_denom=base_denom,genesis=genesis_data, address=bech32_address, amount=amount)
-            base_accounts_added += 1
+        try:
+            amount = int(row[consts.AMOUNT_FIELD_NAME])
+            bech32_address = utils.hex_to_bech32(row[consts.CLAIM_ADDRESS_FIELD_NAME][2:].lower(), bech32_prefix)
+            if not utils.is_valid_bech32_address(bech32_prefix, bech32_address):
+                raise ValueError(f"Invalid address: {bech32_address}")
+            if row.get(consts.VESTING_FIELD_NAME) is not None:
+                vesting_start_time = row[consts.VESTING_FIELD_NAME][consts.VESTING_START_TIME_FIELD_NAME]
+                vesting_end_time = row[consts.VESTING_FIELD_NAME][consts.VESTING_END_TIME_FIELD_NAME]
+                genesis_data = add_vesting_account_to_genesis(base_denom=base_denom, genesis=genesis_data, address=bech32_address, amount=amount, 
+                vesting_start_time=vesting_start_time, vesting_end_time=vesting_end_time)
+                vesting_accounts_added += 1
+            else:
+                genesis_data = add_base_account_to_genesis(base_denom=base_denom,genesis=genesis_data, address=bech32_address, amount=amount)
+                base_accounts_added += 1
 
-        # progress bar
-        progress = (vesting_accounts_added + base_accounts_added) / total_accounts
-        progress_percentage = progress * 100
-        progress_bar = '[' + '#' * int(progress * 50) + '-' * (50 - int(progress * 50)) + ']'
-        print(f"\rProgress: {progress_bar} {progress_percentage:.2f}%", end="")
+            # progress bar
+            progress = (vesting_accounts_added + base_accounts_added) / total_accounts
+            progress_percentage = progress * 100
+            progress_bar = '[' + '#' * int(progress * 50) + '-' * (50 - int(progress * 50)) + ']'
+            print(f"\rProgress: {progress_bar} {progress_percentage:.2f}%", end="")
+        except Exception as e:
+            print(f"Error adding account: {row}")
+            print(e)
+            continue
 
     # Make assertions
     assert total_accounts == base_accounts_added + vesting_accounts_added, "Total accounts do not match the sum of base and vesting accounts"
