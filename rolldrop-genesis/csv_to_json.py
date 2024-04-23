@@ -3,6 +3,7 @@ import csv
 import json 
 import os
 import argparse
+import traceback
 
 def is_address(address):
     return len(address) == 42 and address.startswith('0x')
@@ -17,16 +18,33 @@ def csv_to_json(csvFilePath, jsonFilePath):
     
         #convert each csv row into python dict
         for row in csvReader: 
-            if not is_address(row['claim_address']):
-                print(f"Invalid address: {row['claim_address']}")
+            try:
+                if not is_address(row['claim_address']):
+                    print(f"Invalid address: {row['claim_address']}")
+                    continue
+                jsonRow = {}
+                for key, value in row.items():
+                    if '.' in key:
+                       parent_key, child_key = key.split('.')
+                       actualKey = child_key
+                       if parent_key not in jsonRow:
+                            jsonRow[parent_key] = {}
+                       actualObject = jsonRow[parent_key] 
+                    else:
+                        actualKey = key
+                        actualObject = jsonRow
+                    
+                    if actualKey == 'amount':
+                        clearedAmount = Decimal(value.replace(',', ''))
+                        actualObject['amount'] = int(clearedAmount * (Decimal(10) ** 18))
+                    else:
+                        actualObject[actualKey] = value
+                #add this python dict to json array
+                jsonArray.append(jsonRow)
+            except Exception:
+                print(f"\Parsing row failed: {row}")
+                print(traceback.format_exc())
                 continue
-            amount = row['amount']
-            # print(amount)
-            amount = int(Decimal(amount) * (Decimal(10) ** 18))
-            # print(amount)
-            row['amount'] = amount
-            #add this python dict to json array
-            jsonArray.append(row)
   
     #convert python jsonArray to JSON String and write to file
     with open(jsonFilePath, 'w', encoding='utf-8') as jsonf: 

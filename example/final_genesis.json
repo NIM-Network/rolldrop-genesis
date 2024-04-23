@@ -1,6 +1,6 @@
 {
     "genesis_time": "2024-03-01T18:07:47.536225Z",
-    "chain_id": "nim_1122-1",
+    "chain_id": "test-chain-Ah7iBS",
     "initial_height": "1",
     "consensus_params": {
         "block": {
@@ -304,6 +304,7 @@
         "sequencers": {
             "params": {
                 "unbonding_time": "1814400s",
+                "max_sequencers": 1,
                 "historical_entries": 10000
             },
             "sequencers": [],

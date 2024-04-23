@@ -1,30 +1,36 @@
 import json
 import utils
 import consts
+import traceback
 
 
-def add_vesting_account_to_genesis(base_denom, genesis, address, amount, vesting_start_time, vesting_end_time):
+def add_vesting_account_to_genesis(base_denom, genesis, address, amount, vesting_start_time, vesting_end_time, vesting_amount):
+    if vesting_amount is None:
+        vesting_amount = amount
     account_json_obj = {
-    "@type": "/cosmos.vesting.v1beta1.ContinuousVestingAccount",
-    "base_vesting_account": {
-        "base_account": {
-        "address": address,
-        "pub_key": None,
-        "account_number": "0",
-        "sequence": "0"
-        },
-        "original_vesting": [
-        {
-            "denom": base_denom,
-            "amount": str(amount),
+        "@type": "/cosmos.vesting.v1beta1.ContinuousVestingAccount",
+        "base_vesting_account": {
+            "base_account": {
+            "address": address,
+            "pub_key": None,
+            "account_number": "0",
+            "sequence": "0"
+            },
+            "original_vesting": [
+            {
+                "denom": base_denom,
+                "amount": str(vesting_amount),
+            }
+            ],
+            "delegated_free": [],
+            "delegated_vesting": [],
+            "end_time": vesting_end_time
         }
-        ],
-        "delegated_free": [],
-        "delegated_vesting": [],
-        "end_time": vesting_end_time
-    },
-    "start_time": vesting_start_time
     }
+    # start time is optional, without a start time we create a vesting with a cliff
+    if vesting_start_time:
+        account_json_obj["start_time"] = vesting_start_time
+
     balance_json_obj = {
            "address": address,
            "coins": [
@@ -98,10 +104,11 @@ def add_accounts_to_genesis_file(base_denom, bech32_prefix, airdrop_file_path, g
             if not utils.is_valid_bech32_address(bech32_prefix, bech32_address):
                 raise ValueError(f"Invalid address: {bech32_address}")
             if row.get(consts.VESTING_FIELD_NAME) is not None:
-                vesting_start_time = row[consts.VESTING_FIELD_NAME][consts.VESTING_START_TIME_FIELD_NAME]
+                vesting_start_time = row[consts.VESTING_FIELD_NAME].get(consts.VESTING_START_TIME_FIELD_NAME)
                 vesting_end_time = row[consts.VESTING_FIELD_NAME][consts.VESTING_END_TIME_FIELD_NAME]
+                vesting_amount = row[consts.VESTING_FIELD_NAME].get(consts.VESTING_AMOUNT_FIELD_NAME)
                 genesis_data = add_vesting_account_to_genesis(base_denom=base_denom, genesis=genesis_data, address=bech32_address, amount=amount, 
-                vesting_start_time=vesting_start_time, vesting_end_time=vesting_end_time)
+                vesting_start_time=vesting_start_time, vesting_end_time=vesting_end_time, vesting_amount=vesting_amount)
                 vesting_accounts_added += 1
             else:
                 genesis_data = add_base_account_to_genesis(base_denom=base_denom,genesis=genesis_data, address=bech32_address, amount=amount)
@@ -112,14 +119,14 @@ def add_accounts_to_genesis_file(base_denom, bech32_prefix, airdrop_file_path, g
             progress_percentage = progress * 100
             progress_bar = '[' + '#' * int(progress * 50) + '-' * (50 - int(progress * 50)) + ']'
             print(f"\rProgress: {progress_bar} {progress_percentage:.2f}%", end="")
-        except Exception as e:
-            print(f"Error adding account: {row}")
-            print(e)
+        except Exception:
+            print(f"\nAdding an account failed: {row}")
+            print(traceback.format_exc())
             continue
-
+    print
     # Make assertions
-    assert total_accounts == base_accounts_added + vesting_accounts_added, "Total accounts do not match the sum of base and vesting accounts"
-    print(f"Added {base_accounts_added} base accounts and {vesting_accounts_added} vesting accounts to genesis file")
+    assert total_accounts == base_accounts_added + vesting_accounts_added, f"Total accounts - {total_accounts} do not match the sum of base - {base_accounts_added} and vesting - {vesting_accounts_added} accounts"
+    print(f"\nAdded {base_accounts_added} base accounts and {vesting_accounts_added} vesting accounts to genesis file")
     
     # Write the updated genesis_data back to the genesis.json file
     with open(output_genesis_file_path, 'w') as genesis_file:
